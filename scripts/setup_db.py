@@ -115,6 +115,7 @@ def create_tables():
             name VARCHAR(100) NOT NULL,
             type ENUM('cash','bank','dps','fdr') NOT NULL,
             balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+            starting_date DATE NULL,
             maturity_date DATE NULL,
             installment_amount DECIMAL(15,2) NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -129,6 +130,13 @@ def create_tables():
             UNIQUE KEY uq_cat_name_type (name, type)
         ) ENGINE=InnoDB
     """)
+
+    # Auto-migrate: add starting_date to accounts if missing
+    try:
+        cursor.execute("ALTER TABLE accounts ADD COLUMN starting_date DATE NULL AFTER balance")
+        print("Migration: added starting_date to accounts")
+    except Exception:
+        pass  # column already exists
 
     # Auto-migrate: add 'both' to existing categories ENUM if missing
     try:
