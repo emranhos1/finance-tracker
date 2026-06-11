@@ -1,4 +1,4 @@
-// dashboard.js — data logic only
+// dashboard.js
 
 async function renderDashboard(container) {
   container.innerHTML = '<div class="loading">Loading dashboard...</div>';
@@ -17,15 +17,22 @@ async function renderDashboard(container) {
   try {
     data = await API.get('/api/dashboard/summary');
   } catch(e) {
-    showAlert(container, e.message, 'error');
+    container.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
     return;
   }
 
-  document.getElementById('netWorth').textContent = fmt(data.net_worth);
-  renderPeriodStats('todayStats', data.today);
-  renderPeriodStats('monthStats', data.month);
-  renderPeriodStats('yearStats', data.year);
+  // Top summary cards
+  document.getElementById('netWorth').textContent   = fmt(data.net_worth);
+  document.getElementById('cashTotal').textContent  = fmt(data.cash_total);
+  document.getElementById('bankTotal').textContent  = fmt(data.bank_total);
+  document.getElementById('savingsTotal').textContent = fmt(data.dps_total + data.fdr_total);
 
+  // Period cards
+  renderCashCard('todayStats', data.today, 'Today');
+  renderCashCard('monthStats', data.month, 'This Month');
+  renderCashCard('yearStats',  data.year,  'This Year');
+
+  // Account balances
   const accEl = document.getElementById('accountBalances');
   if (!data.accounts.length) {
     accEl.innerHTML = '<div class="empty">No accounts yet</div>';
@@ -42,6 +49,7 @@ async function renderDashboard(container) {
     `).join('');
   }
 
+  // Category breakdown
   const catEl = document.getElementById('categoryBreakdown');
   if (!data.category_breakdown.length) {
     catEl.innerHTML = '<div class="empty">No expense data this month</div>';
@@ -60,17 +68,21 @@ async function renderDashboard(container) {
   }
 }
 
-function renderPeriodStats(elId, d) {
-  const netColor = d.net >= 0 ? 'var(--income)' : 'var(--expense)';
+function renderCashCard(elId, d, label) {
   document.getElementById(elId).innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:0.3rem">
-      <div><span class="amount-income">+${fmt(d.income)}</span>
-        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.3rem">income</span></div>
-      <div><span class="amount-expense">-${fmt(d.expense)}</span>
-        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.3rem">expense</span></div>
-      <div style="border-top:1px solid var(--border);padding-top:0.3rem;margin-top:0.1rem">
-        <span style="font-weight:700;color:${netColor}">${d.net >= 0 ? '+' : ''}${fmt(d.net)}</span>
-        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.3rem">net</span>
+    <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.25rem">
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+        <span style="color:var(--text-muted)">Opening Cash</span>
+        <span style="font-weight:600">${fmt(d.opening_cash)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+        <span style="color:var(--text-muted)">Total Out</span>
+        <span class="amount-expense">−${fmt(d.out)}</span>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:0.25rem;padding-top:0.4rem;
+        display:flex;justify-content:space-between">
+        <span style="color:var(--text-muted);font-size:0.85rem">Cash in Hand Now</span>
+        <span style="font-weight:700;font-size:1rem;color:${d.current_cash >= 0 ? 'var(--income)' : 'var(--expense)'}">${fmt(d.current_cash)}</span>
       </div>
     </div>
   `;
