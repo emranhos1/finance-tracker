@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Manager</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<script>if (!localStorage.getItem('token')) window.location.href = '/';</script>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-icon">💰</span>
+      <span class="logo-text">Finance</span>
+    </div>
+    <ul class="nav-links">
+      <li><button class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</button></li>
+      <li><button class="nav-btn" data-page="accounts"><span class="nav-icon">🏦</span> Accounts</button></li>
+      <li><button class="nav-btn" data-page="categories"><span class="nav-icon">🏷️</span> Categories</button></li>
+      <li><button class="nav-btn" data-page="transaction"><span class="nav-icon">💸</span> New Transaction</button></li>
+      <li><button class="nav-btn" data-page="transfer"><span class="nav-icon">🔄</span> Transfer</button></li>
+      <li><button class="nav-btn" data-page="reports"><span class="nav-icon">📈</span> Reports</button></li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="logout-btn" id="logoutBtn">⬅ Logout</button>
+    </div>
+  </nav>
+
+  <main class="main-content" id="mainContent">
+    <div class="loading">Loading...</div>
+  </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/accounts.js"></script>
+<script src="/static/js/categories.js"></script>
+<script src="/static/js/transaction.js"></script>
+<script src="/static/js/transfer.js"></script>
+<script src="/static/js/reports.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

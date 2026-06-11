@@ -1,0 +1,57 @@
+<div class="page-header">
+  <h1>New Transaction</h1>
+</div>
+
+<div id="txnAlert"></div>
+
+<div class="grid-2">
+  <div class="card">
+    <!-- Type Tabs -->
+    <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:1.25rem">
+      <button class="tab-btn active" data-tab="income"
+        style="flex:1;padding:0.6rem;border:none;cursor:pointer;background:var(--surface2);color:var(--income);font-weight:600;font-size:0.9rem">
+        ▲ Income
+      </button>
+      <button class="tab-btn" data-tab="expense"
+        style="flex:1;padding:0.6rem;border:none;cursor:pointer;background:transparent;color:var(--text-muted);font-weight:600;font-size:0.9rem">
+        ▼ Expense
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label>Date</label>
+      <input type="date" id="txnDate">
+    </div>
+
+    <div class="form-group">
+      <label id="accountLabel">To Account</label>
+      <select id="txnAccount">
+        <option value="">— Select account —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Category</label>
+      <select id="txnCategory">
+        <option value="">— Select category —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Amount (৳)</label>
+      <input type="number" id="txnAmount" placeholder="0.00" step="0.01" min="0.01">
+    </div>
+
+    <div class="form-group">
+      <label>Note (optional)</label>
+      <input type="text" id="txnNote" placeholder="Brief description...">
+    </div>
+
+    <button class="btn btn-primary" id="saveTxn" style="width:100%">Record Transaction</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Recent Transactions</div>
+    <div id="recentTxns"><div class="loading">Loading...</div></div>
+  </div>
+</div>
