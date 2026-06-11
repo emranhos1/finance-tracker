@@ -26,13 +26,25 @@ async function renderTransaction(container) {
   const incomeCategories  = categories.filter(c => c.type === 'income' || c.type === 'both');
   const expenseCategories = categories.filter(c => c.type === 'expense' || c.type === 'both');
 
-  // Populate accounts
+  // Populate accounts — name only, no balance
   const accSelect = document.getElementById('txnAccount');
+  const accBalanceDisplay = document.getElementById('accBalanceDisplay');
+
   accounts.forEach(a => {
     const opt = document.createElement('option');
     opt.value = a.id;
-    opt.textContent = `${a.name} (${a.type}) — ${fmt(a.balance)}`;
+    opt.textContent = `${a.name} (${a.type})`;
+    opt.dataset.balance = a.balance;
     accSelect.appendChild(opt);
+  });
+
+  accSelect.addEventListener('change', () => {
+    const selected = accSelect.options[accSelect.selectedIndex];
+    if (selected.value) {
+      accBalanceDisplay.textContent = `Current Balance: ${fmt(selected.dataset.balance)}`;
+    } else {
+      accBalanceDisplay.textContent = '';
+    }
   });
 
   // Populate categories (income by default)
