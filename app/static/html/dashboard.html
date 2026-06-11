@@ -3,28 +3,43 @@
   <span id="dashDate" style="color:var(--text-muted);font-size:0.8rem"></span>
 </div>
 
-<div style="margin-bottom:1rem">
-  <div class="card net-worth-card">
-    <div class="card-title">💎 Total Net Worth</div>
-    <div class="card-value" id="netWorth">—</div>
+<!-- Account Type Summary Cards -->
+<div class="grid-4" style="margin-bottom:1rem">
+  <div class="card" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:#4338ca">
+    <div class="card-title" style="color:rgba(255,255,255,0.8)">💎 Total Net Worth</div>
+    <div class="card-value" id="netWorth" style="color:#fff;font-size:1.5rem">—</div>
+  </div>
+  <div class="card">
+    <div class="card-title">💵 Cash in Hand</div>
+    <div class="card-value" id="cashTotal" style="font-size:1.4rem">—</div>
+  </div>
+  <div class="card">
+    <div class="card-title">🏦 In Bank</div>
+    <div class="card-value" id="bankTotal" style="font-size:1.4rem">—</div>
+  </div>
+  <div class="card">
+    <div class="card-title">🏛 Savings (DPS/FDR)</div>
+    <div class="card-value" id="savingsTotal" style="font-size:1.4rem">—</div>
   </div>
 </div>
 
+<!-- Period Cards -->
 <div class="grid-3" style="margin-bottom:1.5rem">
   <div class="card">
-    <div class="card-title">Today</div>
+    <div class="card-title">📅 Today</div>
     <div id="todayStats"></div>
   </div>
   <div class="card">
-    <div class="card-title">This Month</div>
+    <div class="card-title">🗓 This Month</div>
     <div id="monthStats"></div>
   </div>
   <div class="card">
-    <div class="card-title">This Year</div>
+    <div class="card-title">📆 This Year</div>
     <div id="yearStats"></div>
   </div>
 </div>
 
+<!-- Bottom Section -->
 <div class="grid-2">
   <div class="card">
     <div class="section-title">Account Balances</div>
