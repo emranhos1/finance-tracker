@@ -15,6 +15,7 @@ class AccountCreate(BaseModel):
     name: str
     type: str
     balance: Decimal = Decimal("0.00")
+    starting_date: Optional[date] = None
     maturity_date: Optional[date] = None
     installment_amount: Optional[Decimal] = None
 
@@ -23,6 +24,7 @@ class AccountUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     balance: Optional[Decimal] = None
+    starting_date: Optional[date] = None
     maturity_date: Optional[date] = None
     installment_amount: Optional[Decimal] = None
 
@@ -36,6 +38,7 @@ def list_accounts(db: Session = Depends(get_db), _=Depends(get_current_user)):
             "name": a.name,
             "type": a.type,
             "balance": float(a.balance),
+            "starting_date": a.starting_date.isoformat() if a.starting_date else None,
             "maturity_date": a.maturity_date.isoformat() if a.maturity_date else None,
             "installment_amount": float(a.installment_amount) if a.installment_amount else None,
         }
