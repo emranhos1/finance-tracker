@@ -19,19 +19,31 @@ async function renderTransfer(container) {
     return;
   }
 
-  const fromSel = document.getElementById('trFrom');
-  const toSel   = document.getElementById('trTo');
+  const fromSel        = document.getElementById('trFrom');
+  const toSel          = document.getElementById('trTo');
+  const trFromBalance  = document.getElementById('trFromBalance');
+  const trToBalance    = document.getElementById('trToBalance');
 
   accounts.forEach(a => {
-    const optFrom = document.createElement('option');
-    optFrom.value = a.id;
-    optFrom.textContent = `${a.name} (${a.type}) — ${fmt(a.balance)}`;
-    fromSel.appendChild(optFrom);
+    const makeOpt = () => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.name} (${a.type})`;
+      opt.dataset.balance = a.balance;
+      return opt;
+    };
+    fromSel.appendChild(makeOpt());
+    toSel.appendChild(makeOpt());
+  });
 
-    const optTo = document.createElement('option');
-    optTo.value = a.id;
-    optTo.textContent = `${a.name} (${a.type}) — ${fmt(a.balance)}`;
-    toSel.appendChild(optTo);
+  fromSel.addEventListener('change', () => {
+    const sel = fromSel.options[fromSel.selectedIndex];
+    trFromBalance.textContent = sel.value ? `Current Balance: ${fmt(sel.dataset.balance)}` : '';
+  });
+
+  toSel.addEventListener('change', () => {
+    const sel = toSel.options[toSel.selectedIndex];
+    trToBalance.textContent = sel.value ? `Current Balance: ${fmt(sel.dataset.balance)}` : '';
   });
 
   loadRecentTransfers();
