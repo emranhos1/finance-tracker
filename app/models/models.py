@@ -19,6 +19,7 @@ class Account(Base):
     name = Column(String(100), nullable=False)
     type = Column(Enum("cash", "bank", "dps", "fdr"), nullable=False)
     balance = Column(Numeric(15, 2), nullable=False, default=0.00)
+    starting_date = Column(Date, nullable=True)
     maturity_date = Column(Date, nullable=True)
     installment_amount = Column(Numeric(15, 2), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
