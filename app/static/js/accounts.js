@@ -35,6 +35,7 @@ async function loadAccounts(container) {
       <td><strong>${a.name}</strong></td>
       <td><span class="badge badge-${a.type}">${a.type.toUpperCase()}</span></td>
       <td class="${a.balance >= 0 ? 'amount-income' : 'amount-expense'}">${fmt(a.balance)}</td>
+      <td>${a.starting_date ? fmtDate(a.starting_date) : '—'}</td>
       <td>${a.maturity_date ? fmtDate(a.maturity_date) : '—'}</td>
       <td>${a.installment_amount ? fmt(a.installment_amount) : '—'}</td>
       <td style="display:flex;gap:0.4rem">
@@ -71,16 +72,22 @@ function showAccountModal(container, existing = null) {
     overlay.querySelector('#accName').value    = existing.name;
     overlay.querySelector('#accType').value    = existing.type;
     overlay.querySelector('#accBalance').value = existing.balance;
-    if (existing.maturity_date)    overlay.querySelector('#accMaturity').value    = existing.maturity_date;
+    if (existing.starting_date)      overlay.querySelector('#accStarting').value    = existing.starting_date;
+    if (existing.maturity_date)      overlay.querySelector('#accMaturity').value    = existing.maturity_date;
     if (existing.installment_amount) overlay.querySelector('#accInstallment').value = existing.installment_amount;
-    if (['dps','fdr'].includes(existing.type)) overlay.querySelector('#dpsFields').style.display = '';
+    updateDpsFields();
   }
 
-  const accType  = overlay.querySelector('#accType');
+  const accType   = overlay.querySelector('#accType');
   const dpsFields = overlay.querySelector('#dpsFields');
-  accType.addEventListener('change', () => {
-    dpsFields.style.display = ['dps','fdr'].includes(accType.value) ? '' : 'none';
-  });
+  const installmentGroup = overlay.querySelector('#installmentGroup');
+
+  function updateDpsFields() {
+    const t = accType.value;
+    dpsFields.style.display = ['dps','fdr'].includes(t) ? '' : 'none';
+    installmentGroup.style.display = t === 'dps' ? '' : 'none';
+  }
+  accType.addEventListener('change', updateDpsFields);
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   overlay.querySelector('#cancelModal').addEventListener('click', () => overlay.remove());
@@ -89,6 +96,7 @@ function showAccountModal(container, existing = null) {
     const name      = overlay.querySelector('#accName').value.trim();
     const type      = accType.value;
     const balance   = parseFloat(overlay.querySelector('#accBalance').value) || 0;
+    const starting  = overlay.querySelector('#accStarting').value || null;
     const maturity  = overlay.querySelector('#accMaturity').value || null;
     const installment = overlay.querySelector('#accInstallment').value || null;
 
@@ -99,10 +107,10 @@ function showAccountModal(container, existing = null) {
 
     try {
       if (isEdit) {
-        await API.put(`/api/accounts/${existing.id}`, { name, type, balance, maturity_date: maturity, installment_amount: installment ? parseFloat(installment) : null });
+        await API.put(`/api/accounts/${existing.id}`, { name, type, balance, starting_date: starting, maturity_date: maturity, installment_amount: installment ? parseFloat(installment) : null });
         showAlert(document.getElementById('accountAlert'), 'Account updated');
       } else {
-        await API.post('/api/accounts/', { name, type, balance, maturity_date: maturity, installment_amount: installment ? parseFloat(installment) : null });
+        await API.post('/api/accounts/', { name, type, balance, starting_date: starting, maturity_date: maturity, installment_amount: installment ? parseFloat(installment) : null });
         showAlert(document.getElementById('accountAlert'), 'Account created');
       }
       overlay.remove();
