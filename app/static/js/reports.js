@@ -11,32 +11,25 @@ async function renderReports(container) {
 
   const today = new Date();
 
-  // Populate years
   const yearSel = document.getElementById('rYear');
   for (let y = today.getFullYear(); y >= today.getFullYear() - 5; y--) {
     const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
+    opt.value = y; opt.textContent = y;
     if (y === today.getFullYear()) opt.selected = true;
     yearSel.appendChild(opt);
   }
-
-  // Set current month
   document.getElementById('rMonth').value = today.getMonth() + 1;
 
-  // Populate accounts
   try {
     const accounts = await API.get('/api/accounts/');
     const accSel = document.getElementById('rAccount');
     accounts.forEach(a => {
       const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = a.name;
+      opt.value = a.id; opt.textContent = a.name;
       accSel.appendChild(opt);
     });
   } catch(e) {}
 
-  // Period change handler
   const periodSel  = document.getElementById('rPeriod');
   const monthGroup = document.getElementById('monthGroup');
   const yearGroup  = document.getElementById('yearGroup');
@@ -57,7 +50,7 @@ async function loadReport() {
   const account_id = document.getElementById('rAccount').value;
 
   let url = `/api/reports/?period=${period}`;
-  if (year)       url += `&year=${year}`;
+  if (year) url += `&year=${year}`;
   if (month && period === 'daily') url += `&month=${month}`;
   if (account_id) url += `&account_id=${account_id}`;
 
@@ -72,11 +65,14 @@ async function loadReport() {
     return;
   }
 
-  const totalIncome  = data.rows.reduce((s, r) => s + r.income,  0);
-  const totalExpense = data.rows.reduce((s, r) => s + r.expense, 0);
-  const totalNet     = totalIncome - totalExpense;
+  // Grand totals
+  const totalIncome   = data.rows.reduce((s, r) => s + (r.income   || 0), 0);
+  const totalExpense  = data.rows.reduce((s, r) => s + (r.expense  || 0), 0);
+  const totalTransfer = data.rows.reduce((s, r) => s + (r.transfer || 0), 0);
+  const totalNet      = totalIncome - totalExpense;
 
-  resultsEl.innerHTML = `
+  // Summary cards
+  const summaryHtml = `
     <div class="grid-3" style="margin-bottom:1.5rem">
       <div class="card">
         <div class="card-title">Total Income</div>
@@ -92,28 +88,68 @@ async function loadReport() {
           ${totalNet >= 0 ? '+' : ''}${fmt(totalNet)}
         </div>
       </div>
-    </div>
+    </div>`;
+
+  // Transaction details table with grand total row
+  const breakdownHtml = `
     <div class="card" style="margin-bottom:1.5rem">
-      <div class="section-title">Period Breakdown</div>
+      <div class="section-title">Transaction Details</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Period</th><th>Income</th><th>Expense</th><th>Net</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Account</th>
+              <th>Note</th>
+              <th style="text-align:right">Income</th>
+              <th style="text-align:right">Expense</th>
+              <th style="text-align:right">Transfer</th>
+            </tr>
+          </thead>
           <tbody>
             ${!data.rows.length
-              ? '<tr><td colspan="4" class="empty">No data for selected period</td></tr>'
+              ? '<tr><td colspan="8" class="empty">No data for selected period</td></tr>'
               : data.rows.map(r => `
                 <tr>
-                  <td><strong>${r.period}</strong></td>
-                  <td class="amount-income">+${fmt(r.income)}</td>
-                  <td class="amount-expense">−${fmt(r.expense)}</td>
-                  <td style="color:${r.net >= 0 ? 'var(--income)' : 'var(--expense)'}">
-                    ${r.net >= 0 ? '+' : ''}${fmt(r.net)}
+                  <td style="white-space:nowrap">${r.period}</td>
+                  <td><span class="badge badge-${r.type}">${r.type}</span></td>
+                  <td>${r.type === 'transfer' ? 'Cash' : r.category}</td>
+                  <td style="font-size:0.8rem;color:var(--text-muted)">
+                    ${r.type === 'transfer'
+                      ? `${r.from_account} → ${r.to_account}`
+                      : r.type === 'income' ? r.to_account : r.from_account}
                   </td>
+                  <td style="font-size:0.82rem;color:var(--text-muted)">${r.note}</td>
+                  <td style="text-align:right" class="amount-income">${r.income  > 0 ? '+' + fmt(r.income)  : '—'}</td>
+                  <td style="text-align:right" class="amount-expense">${r.expense > 0 ? '−' + fmt(r.expense) : '—'}</td>
+                  <td style="text-align:right" class="amount-neutral">${r.transfer > 0 ? fmt(r.transfer) : '—'}</td>
                 </tr>`).join('')}
           </tbody>
+          ${data.rows.length > 0 ? `
+          <tfoot>
+            <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">
+              <td colspan="5" style="padding:0.65rem 0.75rem;color:var(--text-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">
+                Grand Total
+              </td>
+              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-income">
+                ${totalIncome > 0 ? '+' + fmt(totalIncome) : '—'}
+              </td>
+              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-expense">
+                ${totalExpense > 0 ? '−' + fmt(totalExpense) : '—'}
+              </td>
+              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-neutral">
+                ${totalTransfer > 0 ? fmt(totalTransfer) : '—'}
+              </td>
+            </tr>
+          </tfoot>` : ''}
         </table>
       </div>
-    </div>
+    </div>`;
+
+  // Account balances
+  const accountsHtml = `
     <div class="card">
       <div class="section-title">Account Balances (Current)</div>
       <div class="table-wrap">
@@ -129,6 +165,7 @@ async function loadReport() {
           </tbody>
         </table>
       </div>
-    </div>
-  `;
+    </div>`;
+
+  resultsEl.innerHTML = summaryHtml + breakdownHtml + accountsHtml;
 }
