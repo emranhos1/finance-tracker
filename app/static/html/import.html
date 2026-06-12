@@ -1,0 +1,67 @@
+<div class="page-header">
+  <h1>📥 Import Data</h1>
+</div>
+
+<div id="importAlert"></div>
+
+<!-- Upload Section -->
+<div class="card" id="uploadSection" style="max-width:560px">
+  <div class="section-title">Step 1 — Upload Excel File</div>
+  <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.25rem;line-height:1.6">
+    আপনার পুরনো monthly Excel ফাইল (Date, Details, Remarks, IN, OUT কলাম সহ) আপলোড করুন।
+    Upload করার পর প্রতিটা row preview এ দেখাবে — তারপর আপনি বেছে নিতে পারবেন কোনগুলো import হবে।
+  </p>
+  <div class="form-group">
+    <label>Excel File (.xlsx)</label>
+    <input type="file" id="importFile" accept=".xlsx,.xlsm">
+  </div>
+  <button class="btn btn-primary" id="previewBtn" style="width:100%">🔍 Read &amp; Preview</button>
+</div>
+
+<!-- Preview Section -->
+<div id="previewSection" style="display:none">
+
+  <div class="card" style="margin-top:1.25rem">
+    <div class="section-title">Step 2 — Review &amp; Edit Rows</div>
+
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem">
+      <button class="btn btn-outline btn-sm" id="selectAllBtn">Select All</button>
+      <button class="btn btn-outline btn-sm" id="deselectAllBtn">Deselect All</button>
+    </div>
+
+    <div class="table-wrap" style="max-height:520px;overflow-y:auto">
+      <table id="previewTable">
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" id="masterCheck" checked></th>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Note</th>
+            <th>Amount</th>
+            <th>Account</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center">
+      <span id="selectedCount" style="font-size:0.85rem;color:var(--text-muted)"></span>
+      <button class="btn btn-primary" id="importSelectedBtn">📤 Import Selected</button>
+    </div>
+  </div>
+
+  <div id="importResult" style="margin-top:1.25rem"></div>
+</div>
+
+<div class="card" style="max-width:560px;margin-top:1rem;background:#fffbeb;border-color:#fde68a">
+  <div style="font-size:0.82rem;color:#92400e;line-height:1.6">
+    ⚠️ <strong>খেয়াল রাখুন:</strong><br>
+    • TOTAL / header row গুলো automatically skip হবে।<br>
+    • একই row দুইবার import করলে transaction duplicate হয়ে যাবে।<br>
+    • শুধু checked (✓) row গুলোই database এ save হবে।<br>
+    • <strong>Transfer</strong> type select করলে — From এবং To দুটো account select করতে হবে (যেমন Cash থেকে Bank, বা Bank থেকে Cash)। Transfer এ Category লাগে না।
+  </div>
+</div>

@@ -86,6 +86,10 @@ async function renderDashboard(container) {
   chartYear.addEventListener('change',  refreshChart);
   chartMonth.addEventListener('change', refreshChart);
   await refreshChart();
+
+  // Custom category tracking cards
+  await loadCustomCards();
+  document.getElementById('addCustomCardBtn').addEventListener('click', showAddCustomCardModal);
 }
 
 function renderCashCard(elId, d) {
@@ -182,4 +186,119 @@ async function loadDailyChart(year, month) {
       min-width:${totalW}px">
       ${bars}
     </div>`;
+}
+
+// ---- Custom Category Tracking Cards ----
+
+const CUSTOM_CARDS_KEY = 'dashboard_custom_cards';
+
+function getCustomCardIds() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_CARDS_KEY) || '[]');
+  } catch(e) {
+    return [];
+  }
+}
+
+function saveCustomCardIds(ids) {
+  localStorage.setItem(CUSTOM_CARDS_KEY, JSON.stringify(ids));
+}
+
+async function loadCustomCards() {
+  const grid  = document.getElementById('customCardsGrid');
+  const empty = document.getElementById('customCardsEmpty');
+  const ids   = getCustomCardIds();
+
+  if (!ids.length) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const cards = await Promise.all(ids.map(async id => {
+    try {
+      return await API.get(`/api/dashboard/category-summary?category_id=${id}`);
+    } catch(e) {
+      return null;
+    }
+  }));
+
+  grid.innerHTML = cards.map((c, i) => {
+    if (!c) return '';
+    const netColor = c.net >= 0 ? 'var(--income)' : 'var(--expense)';
+    return `
+      <div class="card" style="position:relative">
+        <button class="customCardRemove" data-id="${ids[i]}"
+          style="position:absolute;top:0.5rem;right:0.5rem;background:transparent;border:none;
+          color:var(--text-muted);cursor:pointer;font-size:0.85rem;line-height:1" title="Remove card">✕</button>
+        <div class="card-title">📌 ${c.category_name}</div>
+        <div class="card-value" style="color:${netColor}">${fmt(c.net)}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;display:flex;justify-content:space-between">
+          <span class="amount-income">+${fmt(c.total_income)}</span>
+          <span class="amount-expense">−${fmt(c.total_expense)}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.customCardRemove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.dataset.id);
+      const updated = getCustomCardIds().filter(x => x !== id);
+      saveCustomCardIds(updated);
+      loadCustomCards();
+    });
+  });
+}
+
+async function showAddCustomCardModal() {
+  let categories;
+  try {
+    categories = await API.get('/api/categories/');
+  } catch(e) {
+    categories = [];
+  }
+
+  if (!categories.length) {
+    alert('কোনো category পাওয়া যায়নি। আগে Categories page থেকে category তৈরি করুন।');
+    return;
+  }
+
+  const existingIds = getCustomCardIds();
+  const available = categories.filter(c => !existingIds.includes(c.id));
+
+  if (!available.length) {
+    alert('সব category ইতিমধ্যে track করা হচ্ছে।');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:380px">
+      <h2>📌 Add Tracking Card</h2>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="customCardCategory">
+          ${available.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('')}
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="customCardCancel">Cancel</button>
+        <button class="btn btn-primary" id="customCardAdd">Add Card</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#customCardCancel').addEventListener('click', () => overlay.remove());
+
+  overlay.querySelector('#customCardAdd').addEventListener('click', async () => {
+    const catId = parseInt(overlay.querySelector('#customCardCategory').value);
+    const ids = getCustomCardIds();
+    ids.push(catId);
+    saveCustomCardIds(ids);
+    overlay.remove();
+    await loadCustomCards();
+  });
 }

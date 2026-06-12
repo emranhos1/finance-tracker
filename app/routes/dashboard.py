@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
@@ -74,6 +74,42 @@ def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_
         "year":  {"opening_cash": current_cash + year_out,  "out": year_out,  "current_cash": current_cash},
         "category_breakdown": [{"name": r.name, "total": float(r.total)} for r in cat_breakdown],
         "accounts": [{"id": a.id, "name": a.name, "type": a.type, "balance": float(a.balance)} for a in accounts],
+    }
+
+
+@router.get("/category-summary")
+def category_summary(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    category = db.query(Category).filter(
+        Category.id == category_id, Category.user_id == current_user.id
+    ).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    income_total = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.category_id == category_id,
+        Transaction.type == 'income',
+    ).scalar()
+
+    expense_total = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.category_id == category_id,
+        Transaction.type == 'expense',
+    ).scalar()
+
+    income_total = float(income_total or 0)
+    expense_total = float(expense_total or 0)
+
+    return {
+        "category_id": category.id,
+        "category_name": category.name,
+        "total_income": income_total,
+        "total_expense": expense_total,
+        "net": income_total - expense_total,
     }
 
 

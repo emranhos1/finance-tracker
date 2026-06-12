@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, accounts, transactions, categories, dashboard, admin
+from app.routes import auth, accounts, transactions, categories, dashboard, admin, import_data
 
 app = FastAPI(title="Finance Manager", docs_url="/api/docs", redoc_url=None)
 
@@ -21,6 +21,7 @@ app.include_router(categories.router)
 app.include_router(dashboard.router)
 app.include_router(dashboard.reports_router)
 app.include_router(admin.router)
+app.include_router(import_data.router)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

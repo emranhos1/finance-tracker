@@ -121,7 +121,8 @@ async function loadRecentTxns() {
   const el = document.getElementById('recentTxns');
   el.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const txns = await API.get('/api/transactions/?limit=20');
+    const allTxns = await API.get('/api/transactions/?limit=50');
+    const txns = allTxns.filter(t => t.type !== 'transfer').slice(0, 20);
     if (!txns.length) { el.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
     el.innerHTML = txns.map(t => `
       <div style="display:flex;justify-content:space-between;align-items:center;

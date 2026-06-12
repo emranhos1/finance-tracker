@@ -7,6 +7,7 @@ const pages = {
   transaction: renderTransaction,
   transfer:    renderTransfer,
   reports:     renderReports,
+  import:      renderImport,
   admin:       renderAdmin,
 };
 

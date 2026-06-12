@@ -285,3 +285,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .cat-bar-label { display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.82rem; color: var(--text); }
 .cat-bar-track { background: var(--surface2); border-radius: 4px; height: 7px; }
 .cat-bar-fill  { background: var(--expense); border-radius: 4px; height: 7px; transition: width 0.3s; }
+
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
