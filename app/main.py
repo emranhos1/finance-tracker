@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, accounts, transactions, categories, dashboard
+from app.routes import auth, accounts, transactions, categories, dashboard, admin
 
 app = FastAPI(title="Finance Manager", docs_url="/api/docs", redoc_url=None)
 
@@ -20,6 +20,7 @@ app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(dashboard.router)
 app.include_router(dashboard.reports_router)
+app.include_router(admin.router)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -28,6 +29,17 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 def root():
     return FileResponse("app/static/html/login.html")
 
+@app.get("/register")
+def register_page():
+    return FileResponse("app/static/html/register.html")
+
+@app.get("/forgot-password")
+def forgot_password_page():
+    return FileResponse("app/static/html/forgot_password.html")
+
+@app.get("/reset-password")
+def reset_password_page():
+    return FileResponse("app/static/html/reset_password.html")
 
 @app.get("/app")
 def spa():

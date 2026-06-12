@@ -1,0 +1,49 @@
+<div class="page-header">
+  <h1>⚙️ Admin Panel</h1>
+</div>
+
+<div id="adminAlert"></div>
+
+<!-- User List -->
+<div class="card" style="margin-bottom:1.5rem">
+  <div class="section-title">Registered Users</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Registered</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersBody">
+        <tr><td colspan="5" class="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- User Report Section -->
+<div class="card" id="userReportSection" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div class="section-title" style="margin-bottom:0">Report for: <span id="reportUsername" style="color:var(--primary)"></span></div>
+    <button class="btn btn-outline btn-sm" id="closeReport">✕ Close</button>
+  </div>
+  <div class="filter-bar" style="margin-bottom:1rem">
+    <div class="form-group">
+      <label>From</label>
+      <input type="date" id="reportStart">
+    </div>
+    <div class="form-group">
+      <label>To</label>
+      <input type="date" id="reportEnd">
+    </div>
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button class="btn btn-primary" id="loadReportBtn">Generate</button>
+    </div>
+  </div>
+  <div id="reportResults"></div>
+</div>

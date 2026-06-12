@@ -1,9 +1,5 @@
-import os
-import sys
-import time
-import traceback
+import os, sys, time, traceback
 
-# Load .env manually
 try:
     with open('/app/.env') as f:
         for line in f:
@@ -17,35 +13,28 @@ except FileNotFoundError:
 try:
     import MySQLdb
 except ImportError as e:
-    print(f"FATAL: MySQLdb not installed: {e}")
-    sys.exit(1)
+    print(f"FATAL: MySQLdb not installed: {e}"); sys.exit(1)
 
-MYSQL_HOST     = os.getenv("MYSQL_HOST", "host.docker.internal")
-MYSQL_PORT     = int(os.getenv("MYSQL_PORT", 3306))
-MYSQL_ROOT_USER = os.getenv("MYSQL_ROOT_USER", "root")
+MYSQL_HOST          = os.getenv("MYSQL_HOST", "host.docker.internal")
+MYSQL_PORT          = int(os.getenv("MYSQL_PORT", 3306))
+MYSQL_ROOT_USER     = os.getenv("MYSQL_ROOT_USER", "root")
 MYSQL_ROOT_PASSWORD = os.getenv("MYSQL_ROOT_PASSWORD", "")
-MYSQL_USER     = os.getenv("MYSQL_USER", "finance_user")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "finance_db")
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+MYSQL_USER          = os.getenv("MYSQL_USER", "finance_user")
+MYSQL_PASSWORD      = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DATABASE      = os.getenv("MYSQL_DATABASE", "finance_db")
+ADMIN_USERNAME      = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD      = os.getenv("ADMIN_PASSWORD", "")
 
-print(f"Config: host={MYSQL_HOST} port={MYSQL_PORT} root_user={MYSQL_ROOT_USER} db={MYSQL_DATABASE}")
-print(f"Admin username: {ADMIN_USERNAME} | Password length: {len(ADMIN_PASSWORD)} bytes")
+print(f"Config: host={MYSQL_HOST} port={MYSQL_PORT} db={MYSQL_DATABASE}")
+print(f"Admin: {ADMIN_USERNAME} | Password length: {len(ADMIN_PASSWORD)} bytes")
 
-# Validate password length before attempting hash
 if len(ADMIN_PASSWORD.encode('utf-8')) > 72:
-    print(f"FATAL: ADMIN_PASSWORD is too long ({len(ADMIN_PASSWORD.encode())} bytes). "
-          f"bcrypt max is 72 bytes. Please shorten it in .env")
-    sys.exit(1)
-
+    print("FATAL: ADMIN_PASSWORD too long (max 72 bytes)"); sys.exit(1)
 if not ADMIN_PASSWORD:
-    print("FATAL: ADMIN_PASSWORD is empty in .env")
-    sys.exit(1)
+    print("FATAL: ADMIN_PASSWORD is empty"); sys.exit(1)
 
 
 def hash_password(password: str) -> str:
-    """Hash password using bcrypt directly (bypasses passlib version issues)."""
     import bcrypt
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -54,102 +43,81 @@ def wait_for_mysql(host, port, user, password, max_retries=30):
     print(f"Waiting for MySQL at {host}:{port} as '{user}'...")
     for attempt in range(1, max_retries + 1):
         try:
-            conn = MySQLdb.connect(
-                host=host, port=port, user=user, passwd=password,
-                connect_timeout=5
-            )
+            conn = MySQLdb.connect(host=host, port=port, user=user, passwd=password, connect_timeout=5)
             conn.close()
             print(f"MySQL is ready (attempt {attempt})")
             return True
         except Exception as e:
             print(f"  Attempt {attempt}/{max_retries}: {e}")
             time.sleep(2)
-    print("ERROR: Could not connect to MySQL after max retries.")
-    sys.exit(1)
+    print("ERROR: Could not connect to MySQL after max retries."); sys.exit(1)
 
 
 def setup_database():
     wait_for_mysql(MYSQL_HOST, MYSQL_PORT, MYSQL_ROOT_USER, MYSQL_ROOT_PASSWORD)
-
-    conn = MySQLdb.connect(
-        host=MYSQL_HOST, port=MYSQL_PORT,
-        user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD,
-    )
+    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD)
     conn.autocommit(True)
     cursor = conn.cursor()
-
-    cursor.execute(
-        f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DATABASE}` "
-        f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-    )
+    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DATABASE}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     print(f"Database '{MYSQL_DATABASE}' ensured.")
-
     try:
-        cursor.execute(
-            f"CREATE USER IF NOT EXISTS '{MYSQL_USER}'@'%' IDENTIFIED BY '{MYSQL_PASSWORD}'"
-        )
-        cursor.execute(
-            f"GRANT ALL PRIVILEGES ON `{MYSQL_DATABASE}`.* TO '{MYSQL_USER}'@'%'"
-        )
+        cursor.execute(f"CREATE USER IF NOT EXISTS '{MYSQL_USER}'@'%' IDENTIFIED BY '{MYSQL_PASSWORD}'")
+        cursor.execute(f"GRANT ALL PRIVILEGES ON `{MYSQL_DATABASE}`.* TO '{MYSQL_USER}'@'%'")
         cursor.execute("FLUSH PRIVILEGES")
         print(f"User '{MYSQL_USER}'@'%' ensured.")
     except Exception as e:
-        print(f"User setup warning (may already exist): {e}")
-
-    cursor.close()
-    conn.close()
+        print(f"User setup warning: {e}")
+    cursor.close(); conn.close()
 
 
 def create_tables():
-    conn = MySQLdb.connect(
-        host=MYSQL_HOST, port=MYSQL_PORT,
-        user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD,
-        db=MYSQL_DATABASE,
-    )
+    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
     conn.autocommit(True)
     cursor = conn.cursor()
+
+    # Users table (app users — not admin)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) NOT NULL UNIQUE,
+            email VARCHAR(100) NOT NULL UNIQUE,
+            hashed_password VARCHAR(255) NOT NULL,
+            role ENUM('admin','user') NOT NULL DEFAULT 'user',
+            is_active BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
+    """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
             name VARCHAR(100) NOT NULL,
-            type ENUM('cash','bank','dps','fdr') NOT NULL,
+            type ENUM('cash','bank','dps','fdr','plot') NOT NULL,
             balance DECIMAL(15,2) NOT NULL DEFAULT 0.00,
             starting_date DATE NULL,
             maturity_date DATE NULL,
+            account_number VARCHAR(50) NULL,
             installment_amount DECIMAL(15,2) NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB
     """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
             name VARCHAR(100) NOT NULL,
             type ENUM('income','expense','both') NOT NULL,
-            UNIQUE KEY uq_cat_name_type (name, type)
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB
     """)
-
-    # Auto-migrate: add starting_date to accounts if missing
-    try:
-        cursor.execute("ALTER TABLE accounts ADD COLUMN starting_date DATE NULL AFTER balance")
-        print("Migration: added starting_date to accounts")
-    except Exception:
-        pass  # column already exists
-
-    # Auto-migrate: add 'both' to existing categories ENUM if missing
-    try:
-        cursor.execute("""
-            ALTER TABLE categories
-            MODIFY COLUMN type ENUM('income','expense','both') NOT NULL
-        """)
-    except Exception:
-        pass  # already correct
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
             date DATE NOT NULL,
             type ENUM('income','expense','transfer') NOT NULL,
             amount DECIMAL(15,2) NOT NULL,
@@ -158,6 +126,7 @@ def create_tables():
             to_account_id INT NULL,
             note TEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
             FOREIGN KEY (from_account_id) REFERENCES accounts(id) ON DELETE SET NULL,
             FOREIGN KEY (to_account_id) REFERENCES accounts(id) ON DELETE SET NULL
@@ -165,41 +134,51 @@ def create_tables():
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS admin_users (
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(50) NOT NULL UNIQUE,
-            hashed_password VARCHAR(255) NOT NULL
+            user_id INT NOT NULL,
+            token VARCHAR(100) NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB
     """)
 
     print("All tables ensured.")
-    cursor.close()
-    conn.close()
+
+    # Auto-migrations
+    migrations = [
+        ("ALTER TABLE categories MODIFY COLUMN type ENUM('income','expense','both') NOT NULL", "categories.type enum"),
+        ("ALTER TABLE accounts ADD COLUMN starting_date DATE NULL AFTER balance", "accounts.starting_date"),
+        ("ALTER TABLE accounts ADD COLUMN account_number VARCHAR(50) NULL AFTER maturity_date", "accounts.account_number"),
+        ("ALTER TABLE accounts MODIFY COLUMN type ENUM('cash','bank','dps','fdr','plot') NOT NULL", "accounts.type plot"),
+    ]
+    for sql, name in migrations:
+        try:
+            cursor.execute(sql)
+            print(f"Migration applied: {name}")
+        except Exception:
+            pass
+
+    cursor.close(); conn.close()
 
 
 def seed_admin():
-    conn = MySQLdb.connect(
-        host=MYSQL_HOST, port=MYSQL_PORT,
-        user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD,
-        db=MYSQL_DATABASE,
-    )
+    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
     cursor = conn.cursor()
-
-    cursor.execute("SELECT id FROM admin_users WHERE username = %s", (ADMIN_USERNAME,))
+    cursor.execute("SELECT id FROM users WHERE username = %s AND role = 'admin'", (ADMIN_USERNAME,))
     if cursor.fetchone():
         print(f"Admin user '{ADMIN_USERNAME}' already exists.")
     else:
         hashed = hash_password(ADMIN_PASSWORD)
         cursor.execute(
-            "INSERT INTO admin_users (username, hashed_password) VALUES (%s, %s)",
-            (ADMIN_USERNAME, hashed),
+            "INSERT INTO users (username, email, hashed_password, role, is_active) VALUES (%s, %s, %s, 'admin', TRUE)",
+            (ADMIN_USERNAME, f"{ADMIN_USERNAME}@admin.local", hashed)
         )
         conn.commit()
         print(f"Admin user '{ADMIN_USERNAME}' created.")
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    cursor.close(); conn.close()
 
 
 if __name__ == "__main__":
@@ -209,6 +188,6 @@ if __name__ == "__main__":
         seed_admin()
         print("=== Setup complete ===")
     except Exception as e:
-        print(f"FATAL ERROR during setup: {e}")
+        print(f"FATAL ERROR: {e}")
         traceback.print_exc()
         sys.exit(1)

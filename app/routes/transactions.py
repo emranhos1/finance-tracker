@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Transaction, Account, Category
+from app.models.models import Transaction, Account, Category, User
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -29,7 +29,7 @@ class TransferCreate(BaseModel):
     note: Optional[str] = None
 
 
-def serialize_transaction(t: Transaction) -> dict:
+def serialize(t: Transaction) -> dict:
     return {
         "id": t.id,
         "date": t.date.isoformat(),
@@ -54,85 +54,70 @@ def list_transactions(
     type: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Transaction)
-    if start_date:
-        query = query.filter(Transaction.date >= start_date)
-    if end_date:
-        query = query.filter(Transaction.date <= end_date)
-    if account_id:
-        query = query.filter(
-            (Transaction.from_account_id == account_id) | (Transaction.to_account_id == account_id)
-        )
-    if type:
-        query = query.filter(Transaction.type == type)
-    transactions = query.order_by(Transaction.date.desc(), Transaction.created_at.desc()).limit(limit).all()
-    return [serialize_transaction(t) for t in transactions]
+    query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
+    if start_date:  query = query.filter(Transaction.date >= start_date)
+    if end_date:    query = query.filter(Transaction.date <= end_date)
+    if account_id:  query = query.filter(
+        (Transaction.from_account_id == account_id) | (Transaction.to_account_id == account_id)
+    )
+    if type: query = query.filter(Transaction.type == type)
+    txns = query.order_by(Transaction.date.desc(), Transaction.created_at.desc()).limit(limit).all()
+    return [serialize(t) for t in txns]
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def create_transaction(payload: TransactionCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def create_transaction(payload: TransactionCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="Use /transfer for transfer type")
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
     try:
-        # Double-entry: update account balance atomically
         if payload.type == "income":
             if not payload.to_account_id:
                 raise HTTPException(status_code=400, detail="to_account_id required for income")
-            account = db.query(Account).filter(Account.id == payload.to_account_id).with_for_update().first()
-            if not account:
-                raise HTTPException(status_code=404, detail="Destination account not found")
+            account = db.query(Account).filter(Account.id == payload.to_account_id, Account.user_id == current_user.id).with_for_update().first()
+            if not account: raise HTTPException(status_code=404, detail="Account not found")
             account.balance += payload.amount
-
-        elif payload.type == "expense":
+        else:
             if not payload.from_account_id:
                 raise HTTPException(status_code=400, detail="from_account_id required for expense")
-            account = db.query(Account).filter(Account.id == payload.from_account_id).with_for_update().first()
-            if not account:
-                raise HTTPException(status_code=404, detail="Source account not found")
+            account = db.query(Account).filter(Account.id == payload.from_account_id, Account.user_id == current_user.id).with_for_update().first()
+            if not account: raise HTTPException(status_code=404, detail="Account not found")
             account.balance -= payload.amount
 
-        txn = Transaction(**payload.model_dump())
+        txn = Transaction(**payload.model_dump(), user_id=current_user.id)
         db.add(txn)
         db.commit()
         db.refresh(txn)
         return {"id": txn.id, "message": "Transaction recorded"}
     except HTTPException:
-        db.rollback()
-        raise
+        db.rollback(); raise
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback(); raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/transfer", status_code=status.HTTP_201_CREATED)
-def create_transfer(payload: TransferCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+def create_transfer(payload: TransferCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     if payload.from_account_id == payload.to_account_id:
         raise HTTPException(status_code=400, detail="Source and destination accounts must differ")
 
     try:
-        from_account = db.query(Account).filter(Account.id == payload.from_account_id).with_for_update().first()
-        to_account = db.query(Account).filter(Account.id == payload.to_account_id).with_for_update().first()
+        from_acc = db.query(Account).filter(Account.id == payload.from_account_id, Account.user_id == current_user.id).with_for_update().first()
+        to_acc   = db.query(Account).filter(Account.id == payload.to_account_id,   Account.user_id == current_user.id).with_for_update().first()
+        if not from_acc: raise HTTPException(status_code=404, detail="Source account not found")
+        if not to_acc:   raise HTTPException(status_code=404, detail="Destination account not found")
 
-        if not from_account:
-            raise HTTPException(status_code=404, detail="Source account not found")
-        if not to_account:
-            raise HTTPException(status_code=404, detail="Destination account not found")
-
-        # Atomic double-entry
-        from_account.balance -= payload.amount
-        to_account.balance += payload.amount
+        from_acc.balance -= payload.amount
+        to_acc.balance   += payload.amount
 
         txn = Transaction(
-            date=payload.date,
-            type="transfer",
-            amount=payload.amount,
+            user_id=current_user.id,
+            date=payload.date, type="transfer", amount=payload.amount,
             from_account_id=payload.from_account_id,
             to_account_id=payload.to_account_id,
             note=payload.note,
@@ -142,40 +127,30 @@ def create_transfer(payload: TransferCreate, db: Session = Depends(get_db), _=De
         db.refresh(txn)
         return {"id": txn.id, "message": "Transfer recorded"}
     except HTTPException:
-        db.rollback()
-        raise
+        db.rollback(); raise
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback(); raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{txn_id}")
-def delete_transaction(txn_id: int, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+def delete_transaction(txn_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    txn = db.query(Transaction).filter(Transaction.id == txn_id, Transaction.user_id == current_user.id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
-
     try:
-        # Reverse the balance effect
         if txn.type == "income" and txn.to_account_id:
-            acc = db.query(Account).filter(Account.id == txn.to_account_id).with_for_update().first()
-            if acc:
-                acc.balance -= txn.amount
+            acc = db.query(Account).filter(Account.id == txn.to_account_id, Account.user_id == current_user.id).with_for_update().first()
+            if acc: acc.balance -= txn.amount
         elif txn.type == "expense" and txn.from_account_id:
-            acc = db.query(Account).filter(Account.id == txn.from_account_id).with_for_update().first()
-            if acc:
-                acc.balance += txn.amount
+            acc = db.query(Account).filter(Account.id == txn.from_account_id, Account.user_id == current_user.id).with_for_update().first()
+            if acc: acc.balance += txn.amount
         elif txn.type == "transfer":
-            from_acc = db.query(Account).filter(Account.id == txn.from_account_id).with_for_update().first()
-            to_acc = db.query(Account).filter(Account.id == txn.to_account_id).with_for_update().first()
-            if from_acc:
-                from_acc.balance += txn.amount
-            if to_acc:
-                to_acc.balance -= txn.amount
-
+            fa = db.query(Account).filter(Account.id == txn.from_account_id, Account.user_id == current_user.id).with_for_update().first()
+            ta = db.query(Account).filter(Account.id == txn.to_account_id,   Account.user_id == current_user.id).with_for_update().first()
+            if fa: fa.balance += txn.amount
+            if ta: ta.balance -= txn.amount
         db.delete(txn)
         db.commit()
         return {"message": "Transaction deleted and balances reversed"}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback(); raise HTTPException(status_code=500, detail=str(e))

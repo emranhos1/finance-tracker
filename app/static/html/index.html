@@ -22,8 +22,30 @@
       <li><button class="nav-btn" data-page="transaction"><span class="nav-icon">💸</span> New Transaction</button></li>
       <li><button class="nav-btn" data-page="transfer"><span class="nav-icon">🔄</span> Transfer</button></li>
       <li><button class="nav-btn" data-page="reports"><span class="nav-icon">📈</span> Reports</button></li>
+      <!-- Admin only -->
+      <li id="adminMenuItem" style="display:none">
+        <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
+        <button class="nav-btn" data-page="admin">
+          <span class="nav-icon">⚙️</span>
+          Admin Panel
+          <span id="pendingBadge" style="
+            display:none;
+            margin-left:auto;
+            background:var(--danger);
+            color:#fff;
+            font-size:0.65rem;
+            font-weight:700;
+            border-radius:10px;
+            padding:0.1rem 0.4rem;
+            min-width:18px;
+            text-align:center;
+          "></span>
+        </button>
+      </li>
     </ul>
     <div class="sidebar-footer">
+      <div id="userInfo" style="font-size:0.78rem;color:var(--text-muted);padding:0.5rem 0;text-align:center"></div>
+      <button class="btn btn-outline" id="changePassBtn" style="width:100%;margin-bottom:0.5rem;font-size:0.82rem">🔑 Change Password</button>
       <button class="logout-btn" id="logoutBtn">⬅ Logout</button>
     </div>
   </nav>
@@ -41,6 +63,7 @@
 <script src="/static/js/transaction.js"></script>
 <script src="/static/js/transfer.js"></script>
 <script src="/static/js/reports.js"></script>
+<script src="/static/js/admin.js"></script>
 <script src="/static/js/app.js"></script>
 </body>
 </html>

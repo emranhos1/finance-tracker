@@ -3,23 +3,35 @@
   <span id="dashDate" style="color:var(--text-muted);font-size:0.8rem"></span>
 </div>
 
-<!-- Account Type Summary Cards -->
-<div class="grid-4" style="margin-bottom:1rem">
-  <div class="card" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border-color:#4338ca">
-    <div class="card-title" style="color:rgba(255,255,255,0.8)">💎 Total Net Worth</div>
-    <div class="card-value" id="netWorth" style="color:#fff;font-size:1.5rem">—</div>
+<!-- Row 1: Net Worth group card -->
+<div class="card" style="margin-bottom:1rem">
+  <div class="section-title" style="margin-bottom:0.75rem">💼 Financial Summary</div>
+  <div class="grid-3">
+    <div style="padding:0.75rem;background:var(--surface2);border-radius:8px">
+      <div class="card-title">🏦 In Bank</div>
+      <div class="card-value" id="bankTotal" style="font-size:1.4rem">—</div>
+    </div>
+    <div style="padding:0.75rem;background:var(--surface2);border-radius:8px">
+      <div class="card-title">🏛 Savings (DPS/FDR)</div>
+      <div class="card-value" id="savingsTotal" style="font-size:1.4rem">—</div>
+    </div>
+    <div style="padding:0.75rem;background:#ede9fe;border-radius:8px;border:1px solid #c4b5fd">
+      <div class="card-title" style="color:#5b21b6">💎 Total Net Worth</div>
+      <div class="card-value" id="netWorth" style="font-size:1.4rem;color:#4c1d95">—</div>
+      <div style="font-size:0.72rem;color:#7c3aed;margin-top:0.25rem">Bank + Savings</div>
+    </div>
   </div>
+</div>
+
+<!-- Row 2: Cash in Hand + Plot -->
+<div class="grid-2" style="margin-bottom:1rem">
   <div class="card">
     <div class="card-title">💵 Cash in Hand</div>
-    <div class="card-value" id="cashTotal" style="font-size:1.4rem">—</div>
+    <div class="card-value" id="cashTotal">—</div>
   </div>
   <div class="card">
-    <div class="card-title">🏦 In Bank</div>
-    <div class="card-value" id="bankTotal" style="font-size:1.4rem">—</div>
-  </div>
-  <div class="card">
-    <div class="card-title">🏛 Savings (DPS/FDR)</div>
-    <div class="card-value" id="savingsTotal" style="font-size:1.4rem">—</div>
+    <div class="card-title">🏗 Plot</div>
+    <div class="card-value" id="plotTotal">—</div>
   </div>
 </div>
 
@@ -49,4 +61,23 @@
     <div class="section-title">Monthly Expense by Category</div>
     <div id="categoryBreakdown"></div>
   </div>
+</div>
+
+<!-- Daily Chart -->
+<div class="card" style="margin-top:1.5rem">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <div class="section-title" style="margin-bottom:0">Daily Income / Expense / Transfer</div>
+    <div style="display:flex;gap:0.5rem;align-items:center">
+      <select id="chartMonth" style="padding:0.35rem 0.6rem;font-size:0.82rem;width:auto">
+        <option value="1">January</option><option value="2">February</option>
+        <option value="3">March</option><option value="4">April</option>
+        <option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option>
+        <option value="9">September</option><option value="10">October</option>
+        <option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="chartYear" style="padding:0.35rem 0.6rem;font-size:0.82rem;width:auto"></select>
+    </div>
+  </div>
+  <div id="dailyChart" style="overflow-x:auto"></div>
 </div>
