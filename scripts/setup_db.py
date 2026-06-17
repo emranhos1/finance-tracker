@@ -32,10 +32,15 @@ def _find_ca_bundle():
     try:
         import certifi
         path = certifi.where()
+        print(f"[debug] certifi module path: {certifi.__file__}")
+        print(f"[debug] certifi.where() returned: {path}")
         if path and os.path.exists(path):
             return path
-    except ImportError:
-        pass
+        print(f"[debug] certifi.where() path does not exist on disk: {path}")
+    except ImportError as e:
+        print(f"[debug] certifi import failed: {e}")
+    except Exception as e:
+        print(f"[debug] certifi.where() raised unexpected error: {e}")
 
     # Fallback: common OS-level locations, in case certifi isn't installed.
     os_candidates = [
@@ -44,7 +49,9 @@ def _find_ca_bundle():
         "/etc/ssl/cert.pem",                     # Alpine
     ]
     for path in os_candidates:
-        if os.path.exists(path):
+        exists = os.path.exists(path)
+        print(f"[debug] checking OS path {path}: {'found' if exists else 'missing'}")
+        if exists:
             return path
     return None
 
