@@ -24,17 +24,26 @@ ADMIN_USERNAME      = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD      = os.getenv("ADMIN_PASSWORD", "")
 
 # TiDB Cloud (and most managed MySQL providers) require TLS on public endpoints.
-# We use the system's CA bundle, which ships in virtually every Linux base image
-# (including the one Render builds your Docker image from) and is kept up to
-# date by the OS — no need to bundle/download a separate cert file.
-SSL_CA_CANDIDATES = [
-    "/etc/ssl/certs/ca-certificates.crt",   # Debian/Ubuntu (most common, incl. python:slim images)
-    "/etc/pki/tls/certs/ca-bundle.crt",      # RHEL/CentOS/Alpine variants
-    "/etc/ssl/cert.pem",                     # Alpine
-]
-
+# Primary source: the `certifi` package (already in requirements.txt). It ships
+# its own CA bundle inside the Python package itself, so it always exists
+# regardless of what's installed at the OS level — more reliable than relying
+# on apt-installed system certs, which can vary by base image.
 def _find_ca_bundle():
-    for path in SSL_CA_CANDIDATES:
+    try:
+        import certifi
+        path = certifi.where()
+        if path and os.path.exists(path):
+            return path
+    except ImportError:
+        pass
+
+    # Fallback: common OS-level locations, in case certifi isn't installed.
+    os_candidates = [
+        "/etc/ssl/certs/ca-certificates.crt",   # Debian/Ubuntu (incl. python:slim images)
+        "/etc/pki/tls/certs/ca-bundle.crt",      # RHEL/CentOS/Alpine variants
+        "/etc/ssl/cert.pem",                     # Alpine
+    ]
+    for path in os_candidates:
         if os.path.exists(path):
             return path
     return None
