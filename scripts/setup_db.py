@@ -17,15 +17,35 @@ except ImportError as e:
 
 MYSQL_HOST          = os.getenv("MYSQL_HOST", "host.docker.internal")
 MYSQL_PORT          = int(os.getenv("MYSQL_PORT", 3306))
-MYSQL_ROOT_USER     = os.getenv("MYSQL_ROOT_USER", "root")
-MYSQL_ROOT_PASSWORD = os.getenv("MYSQL_ROOT_PASSWORD", "")
 MYSQL_USER          = os.getenv("MYSQL_USER", "finance_user")
 MYSQL_PASSWORD      = os.getenv("MYSQL_PASSWORD", "")
 MYSQL_DATABASE      = os.getenv("MYSQL_DATABASE", "finance_db")
 ADMIN_USERNAME      = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD      = os.getenv("ADMIN_PASSWORD", "")
 
-print(f"Config: host={MYSQL_HOST} port={MYSQL_PORT} db={MYSQL_DATABASE}")
+# TiDB Cloud (and most managed MySQL providers) require TLS on public endpoints.
+# We use the system's CA bundle, which ships in virtually every Linux base image
+# (including the one Render builds your Docker image from) and is kept up to
+# date by the OS — no need to bundle/download a separate cert file.
+SSL_CA_CANDIDATES = [
+    "/etc/ssl/certs/ca-certificates.crt",   # Debian/Ubuntu (most common, incl. python:slim images)
+    "/etc/pki/tls/certs/ca-bundle.crt",      # RHEL/CentOS/Alpine variants
+    "/etc/ssl/cert.pem",                     # Alpine
+]
+
+def _find_ca_bundle():
+    for path in SSL_CA_CANDIDATES:
+        if os.path.exists(path):
+            return path
+    return None
+
+# Set MYSQL_USE_SSL=false in your LOCAL .env to skip TLS (local MySQL usually
+# doesn't have it enabled). Leave it unset (or "true") for TiDB Cloud / Render.
+MYSQL_USE_SSL = os.getenv("MYSQL_USE_SSL", "true").lower() not in ("false", "0", "no")
+MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA", _find_ca_bundle()) if MYSQL_USE_SSL else None
+
+print(f"Config: host={MYSQL_HOST} port={MYSQL_PORT} db={MYSQL_DATABASE} user={MYSQL_USER}")
+print(f"SSL CA bundle: {MYSQL_SSL_CA or 'NOT FOUND — connection will likely fail if server requires TLS'}")
 print(f"Admin: {ADMIN_USERNAME} | Password length: {len(ADMIN_PASSWORD)} bytes")
 
 if len(ADMIN_PASSWORD.encode('utf-8')) > 72:
@@ -39,11 +59,28 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
-def wait_for_mysql(host, port, user, password, max_retries=30):
-    print(f"Waiting for MySQL at {host}:{port} as '{user}'...")
+def get_connection(db=None):
+    """Single place that knows how to open a TLS connection to TiDB Cloud."""
+    kwargs = dict(
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        user=MYSQL_USER,
+        passwd=MYSQL_PASSWORD,
+        connect_timeout=10,
+    )
+    if db:
+        kwargs["db"] = db
+    if MYSQL_SSL_CA:
+        kwargs["ssl_mode"] = "VERIFY_IDENTITY"
+        kwargs["ssl"] = {"ca": MYSQL_SSL_CA}
+    return MySQLdb.connect(**kwargs)
+
+
+def wait_for_mysql(max_retries=30):
+    print(f"Waiting for MySQL at {MYSQL_HOST}:{MYSQL_PORT} as '{MYSQL_USER}'...")
     for attempt in range(1, max_retries + 1):
         try:
-            conn = MySQLdb.connect(host=host, port=port, user=user, passwd=password, connect_timeout=5)
+            conn = get_connection()
             conn.close()
             print(f"MySQL is ready (attempt {attempt})")
             return True
@@ -53,25 +90,27 @@ def wait_for_mysql(host, port, user, password, max_retries=30):
     print("ERROR: Could not connect to MySQL after max retries."); sys.exit(1)
 
 
-def setup_database():
-    wait_for_mysql(MYSQL_HOST, MYSQL_PORT, MYSQL_ROOT_USER, MYSQL_ROOT_PASSWORD)
-    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD)
+def ensure_database_exists():
+    """
+    TiDB Cloud Serverless gives you one user (the root-equivalent you generated
+    a password for). That user already has rights to create/use databases, so
+    we just make sure our target database exists — no CREATE USER / GRANT
+    needed (and those would fail on TiDB Cloud anyway since you don't have a
+    true root/superuser on the shared serverless tier).
+    """
+    conn = get_connection()
     conn.autocommit(True)
     cursor = conn.cursor()
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DATABASE}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+    cursor.execute(
+        f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DATABASE}` "
+        f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+    )
     print(f"Database '{MYSQL_DATABASE}' ensured.")
-    try:
-        cursor.execute(f"CREATE USER IF NOT EXISTS '{MYSQL_USER}'@'%' IDENTIFIED BY '{MYSQL_PASSWORD}'")
-        cursor.execute(f"GRANT ALL PRIVILEGES ON `{MYSQL_DATABASE}`.* TO '{MYSQL_USER}'@'%'")
-        cursor.execute("FLUSH PRIVILEGES")
-        print(f"User '{MYSQL_USER}'@'%' ensured.")
-    except Exception as e:
-        print(f"User setup warning: {e}")
     cursor.close(); conn.close()
 
 
 def create_tables():
-    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
+    conn = get_connection(db=MYSQL_DATABASE)
     conn.autocommit(True)
     cursor = conn.cursor()
 
@@ -190,7 +229,7 @@ DEFAULT_ACCOUNT_TYPES = [
 
 
 def seed_account_types_and_migrate():
-    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
+    conn = get_connection(db=MYSQL_DATABASE)
     conn.autocommit(True)
     cursor = conn.cursor()
 
@@ -222,9 +261,8 @@ def seed_account_types_and_migrate():
     cursor.close(); conn.close()
 
 
-
 def seed_admin():
-    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
+    conn = get_connection(db=MYSQL_DATABASE)
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM users WHERE username = %s AND role = 'admin'", (ADMIN_USERNAME,))
     if cursor.fetchone():
@@ -242,7 +280,8 @@ def seed_admin():
 
 if __name__ == "__main__":
     try:
-        setup_database()
+        wait_for_mysql()
+        ensure_database_exists()
         create_tables()
         seed_admin()
         seed_account_types_and_migrate()
