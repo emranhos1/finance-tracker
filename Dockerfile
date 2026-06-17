@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+# Bake the certifi CA path into an env var at build time so runtime always finds it
+RUN pip install --no-cache-dir certifi && python -c "import certifi, os; open('/etc/mysql-ssl-ca-path', 'w').write(certifi.where())"
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

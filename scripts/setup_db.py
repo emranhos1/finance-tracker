@@ -60,7 +60,20 @@ def _find_ca_bundle():
 MYSQL_USE_SSL = os.getenv("MYSQL_USE_SSL", "true").lower() not in ("false", "0", "no")
 if MYSQL_USE_SSL:
     _env_ca = os.getenv("MYSQL_SSL_CA")
-    MYSQL_SSL_CA = _env_ca if _env_ca else _find_ca_bundle()
+    if _env_ca:
+        MYSQL_SSL_CA = _env_ca
+    else:
+        MYSQL_SSL_CA = _find_ca_bundle()
+        # Last resort: hardcoded path that always exists in python:3.11-slim + ca-certificates apt package
+        if not MYSQL_SSL_CA:
+            import certifi
+            MYSQL_SSL_CA = certifi.where()
+        # Final fallback: path baked into image at build time by Dockerfile
+        if not MYSQL_SSL_CA:
+            try:
+                MYSQL_SSL_CA = open("/etc/mysql-ssl-ca-path").read().strip()
+            except Exception:
+                pass
 else:
     MYSQL_SSL_CA = None
 
