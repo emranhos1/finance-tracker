@@ -58,7 +58,11 @@ def _find_ca_bundle():
 # Set MYSQL_USE_SSL=false in your LOCAL .env to skip TLS (local MySQL usually
 # doesn't have it enabled). Leave it unset (or "true") for TiDB Cloud / Render.
 MYSQL_USE_SSL = os.getenv("MYSQL_USE_SSL", "true").lower() not in ("false", "0", "no")
-MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA", _find_ca_bundle()) if MYSQL_USE_SSL else None
+if MYSQL_USE_SSL:
+    _env_ca = os.getenv("MYSQL_SSL_CA")
+    MYSQL_SSL_CA = _env_ca if _env_ca else _find_ca_bundle()
+else:
+    MYSQL_SSL_CA = None
 
 print(f"Config: host={MYSQL_HOST} port={MYSQL_PORT} db={MYSQL_DATABASE} user={MYSQL_USER}")
 print(f"SSL CA bundle: {MYSQL_SSL_CA or 'NOT FOUND — connection will likely fail if server requires TLS'}")
@@ -87,6 +91,7 @@ def get_connection(db=None):
     if db:
         kwargs["db"] = db
     if MYSQL_SSL_CA:
+        kwargs["ssl_mode"] = "VERIFY_IDENTITY"
         kwargs["ssl"] = {"ca": MYSQL_SSL_CA}
     return MySQLdb.connect(**kwargs)
 
