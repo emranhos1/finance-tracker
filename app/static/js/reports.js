@@ -90,7 +90,82 @@ async function loadReport() {
       </div>
     </div>`;
 
-  // Transaction details table with grand total row
+  // Transaction details table with pagination
+  let currentPage = 1;
+  let pageSize = 10;
+  const allRows = data.rows;
+
+  function renderTable() {
+    const start = (currentPage - 1) * pageSize;
+    const end   = start + pageSize;
+    const pageRows = allRows.slice(start, end);
+    const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
+
+    const tbody = document.getElementById('reportTbody');
+    const tfoot = document.getElementById('reportTfoot');
+    const paginationEl = document.getElementById('reportPagination');
+
+    tbody.innerHTML = !pageRows.length
+      ? '<tr><td colspan="8" class="empty">No data for selected period</td></tr>'
+      : pageRows.map(r => `
+          <tr>
+            <td style="white-space:nowrap">${r.period}</td>
+            <td><span class="badge badge-${r.type}">${r.type}</span></td>
+            <td>${r.type === 'transfer' ? 'Cash' : r.category}</td>
+            <td style="font-size:0.8rem;color:var(--text-muted)">
+              ${r.type === 'transfer'
+                ? `${r.from_account} → ${r.to_account}`
+                : r.type === 'income' ? r.to_account : r.from_account}
+            </td>
+            <td style="font-size:0.82rem;color:var(--text-muted)">${r.note}</td>
+            <td style="text-align:right" class="amount-income">${r.income  > 0 ? '+' + fmt(r.income)  : '—'}</td>
+            <td style="text-align:right" class="amount-expense">${r.expense > 0 ? '−' + fmt(r.expense) : '—'}</td>
+            <td style="text-align:right" class="amount-neutral">${r.transfer > 0 ? fmt(r.transfer) : '—'}</td>
+          </tr>`).join('');
+
+    // Grand total row in tfoot
+    tfoot.innerHTML = allRows.length > 0 ? `
+      <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">
+        <td colspan="5" style="padding:0.65rem 0.75rem;color:var(--text-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">
+          Grand Total (${allRows.length} transactions)
+        </td>
+        <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-income">${totalIncome > 0 ? '+' + fmt(totalIncome) : '—'}</td>
+        <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-expense">${totalExpense > 0 ? '−' + fmt(totalExpense) : '—'}</td>
+        <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-neutral">${totalTransfer > 0 ? fmt(totalTransfer) : '—'}</td>
+      </tr>` : '';
+
+    // Pagination controls
+    paginationEl.innerHTML = `
+    <div class="pg-bar">
+      <span style="min-width:130px;white-space:nowrap">Total Arrivals: ${allRows.length}</span>
+      <div class="pg-pages">
+        <button class="pg-btn" id="pgPrev" ${currentPage===1?'disabled':''}>&#8249;</button>
+        ${Array.from({length:Math.min(5,totalPages)},(_,ii)=>{
+          const p=Math.max(1,Math.min(currentPage-2,totalPages-4))+ii;
+          return p<1||p>totalPages?'':
+            `<button class="pg-btn${p===currentPage?' active':''}" data-pg="${p}">${p}</button>`;
+        }).join('')}
+        <button class="pg-btn" id="pgNext" ${currentPage>=totalPages?'disabled':''}>&#8250;</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.4rem;min-width:130px;justify-content:flex-end;white-space:nowrap">
+        Per Page:
+        <select id="pageSizeSel" class="pg-size-sel">
+          ${[10,25,50,100].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join('')}
+        </select>
+      </div>
+    </div>`
+
+    // Bind pagination controls
+    document.getElementById('pageSizeSel').addEventListener('change', e => {
+      pageSize = parseInt(e.target.value);
+      currentPage = 1;
+      renderTable();
+    });
+    document.getElementById('pgPrev').addEventListener('click', () => { currentPage--; renderTable(); });
+    document.getElementById('pgNext').addEventListener('click', () => { currentPage++; renderTable(); });
+    document.querySelectorAll('#reportPagination .pg-btn[data-pg]').forEach(b => b.addEventListener('click', () => { currentPage = parseInt(b.dataset.pg); renderTable(); }));
+  }
+
   const breakdownHtml = `
     <div class="card" style="margin-bottom:1.5rem">
       <div class="section-title">Transaction Details</div>
@@ -108,44 +183,11 @@ async function loadReport() {
               <th style="text-align:right">Transfer</th>
             </tr>
           </thead>
-          <tbody>
-            ${!data.rows.length
-              ? '<tr><td colspan="8" class="empty">No data for selected period</td></tr>'
-              : data.rows.map(r => `
-                <tr>
-                  <td style="white-space:nowrap">${r.period}</td>
-                  <td><span class="badge badge-${r.type}">${r.type}</span></td>
-                  <td>${r.type === 'transfer' ? 'Cash' : r.category}</td>
-                  <td style="font-size:0.8rem;color:var(--text-muted)">
-                    ${r.type === 'transfer'
-                      ? `${r.from_account} → ${r.to_account}`
-                      : r.type === 'income' ? r.to_account : r.from_account}
-                  </td>
-                  <td style="font-size:0.82rem;color:var(--text-muted)">${r.note}</td>
-                  <td style="text-align:right" class="amount-income">${r.income  > 0 ? '+' + fmt(r.income)  : '—'}</td>
-                  <td style="text-align:right" class="amount-expense">${r.expense > 0 ? '−' + fmt(r.expense) : '—'}</td>
-                  <td style="text-align:right" class="amount-neutral">${r.transfer > 0 ? fmt(r.transfer) : '—'}</td>
-                </tr>`).join('')}
-          </tbody>
-          ${data.rows.length > 0 ? `
-          <tfoot>
-            <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">
-              <td colspan="5" style="padding:0.65rem 0.75rem;color:var(--text-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">
-                Grand Total
-              </td>
-              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-income">
-                ${totalIncome > 0 ? '+' + fmt(totalIncome) : '—'}
-              </td>
-              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-expense">
-                ${totalExpense > 0 ? '−' + fmt(totalExpense) : '—'}
-              </td>
-              <td style="text-align:right;padding:0.65rem 0.75rem" class="amount-neutral">
-                ${totalTransfer > 0 ? fmt(totalTransfer) : '—'}
-              </td>
-            </tr>
-          </tfoot>` : ''}
+          <tbody id="reportTbody"></tbody>
+          <tfoot id="reportTfoot"></tfoot>
         </table>
       </div>
+      <div id="reportPagination"></div>
     </div>`;
 
   // Account balances
@@ -159,7 +201,7 @@ async function loadReport() {
             ${data.accounts.map(a => `
               <tr>
                 <td><strong>${a.name}</strong></td>
-                <td><span class="badge badge-${a.type}">${a.type.toUpperCase()}</span></td>
+                <td><span class="badge badge-other">${(a.account_type_name||'—').toUpperCase()}</span></td>
                 <td class="${a.balance >= 0 ? 'amount-income' : 'amount-expense'}">${fmt(a.balance)}</td>
               </tr>`).join('')}
           </tbody>
@@ -168,4 +210,5 @@ async function loadReport() {
     </div>`;
 
   resultsEl.innerHTML = summaryHtml + breakdownHtml + accountsHtml;
+  renderTable();
 }

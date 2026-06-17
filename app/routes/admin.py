@@ -88,7 +88,7 @@ def user_report(
             for t in txns
         ],
         "accounts": [
-            {"name": a.name, "type": a.type, "balance": float(a.balance)}
+            {"name": a.name, "type": a.account_type.name if a.account_type else None, "balance": float(a.balance)}
             for a in accounts
         ],
     }

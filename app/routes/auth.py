@@ -7,9 +7,11 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.auth import verify_password, hash_password, create_access_token, get_current_user
 from app.core.email import send_password_reset_email
-from app.models.models import User, PasswordResetToken
+from app.models.models import User, PasswordResetToken, AccountType
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+DEFAULT_ACCOUNT_TYPES = ["CASH", "BANK", "DPS", "FDR", "PLOT"]
 
 
 class RegisterRequest(BaseModel):
@@ -60,6 +62,12 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.commit()
+    db.refresh(user)
+
+    for name in DEFAULT_ACCOUNT_TYPES:
+        db.add(AccountType(user_id=user.id, name=name))
+    db.commit()
+
     return {"message": "Registration successful. Please wait for admin approval before logging in."}
 
 

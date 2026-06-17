@@ -115,7 +115,7 @@ def preview_excel(
     return {
         "rows": rows,
         "accounts": [
-            {"id": a.id, "name": a.name, "type": a.type, "balance": float(a.balance)}
+            {"id": a.id, "name": a.name, "type": a.account_type.name if a.account_type else "", "balance": float(a.balance)}
             for a in accounts
         ],
         "categories": [

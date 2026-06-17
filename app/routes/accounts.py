@@ -6,14 +6,14 @@ from datetime import date
 from decimal import Decimal
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Account, User
+from app.models.models import Account, AccountType, User
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
 class AccountCreate(BaseModel):
     name: str
-    type: str
+    account_type_id: int
     balance: Decimal = Decimal("0.00")
     account_number: Optional[str] = None
     starting_date: Optional[date] = None
@@ -23,7 +23,7 @@ class AccountCreate(BaseModel):
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
-    type: Optional[str] = None
+    account_type_id: Optional[int] = None
     balance: Optional[Decimal] = None
     account_number: Optional[str] = None
     starting_date: Optional[date] = None
@@ -35,13 +35,21 @@ def serialize(a: Account) -> dict:
     return {
         "id": a.id,
         "name": a.name,
-        "type": a.type,
+        "account_type_id": a.account_type_id,
+        "account_type_name": a.account_type.name if a.account_type else None,
         "balance": float(a.balance),
         "account_number": a.account_number or None,
         "starting_date": a.starting_date.isoformat() if a.starting_date else None,
         "maturity_date": a.maturity_date.isoformat() if a.maturity_date else None,
         "installment_amount": float(a.installment_amount) if a.installment_amount else None,
     }
+
+
+def get_account_type_or_404(db: Session, type_id: int, user_id: int) -> AccountType:
+    t = db.query(AccountType).filter(AccountType.id == type_id, AccountType.user_id == user_id).first()
+    if not t:
+        raise HTTPException(status_code=400, detail="Invalid account type")
+    return t
 
 
 @router.get("/")
@@ -52,8 +60,8 @@ def list_accounts(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_account(payload: AccountCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.type not in ("cash", "bank", "dps", "fdr", "plot"):
-        raise HTTPException(status_code=400, detail="Invalid account type")
+    get_account_type_or_404(db, payload.account_type_id, current_user.id)
+
     account = Account(**payload.model_dump(), user_id=current_user.id)
     db.add(account)
     db.commit()
@@ -66,9 +74,11 @@ def update_account(account_id: int, payload: AccountUpdate, db: Session = Depend
     account = db.query(Account).filter(Account.id == account_id, Account.user_id == current_user.id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if payload.type and payload.type not in ("cash", "bank", "dps", "fdr", "plot"):
-        raise HTTPException(status_code=400, detail="Invalid account type")
-    for field, value in payload.model_dump(exclude_none=True).items():
+
+    if payload.account_type_id is not None:
+        get_account_type_or_404(db, payload.account_type_id, current_user.id)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(account, field, value)
     db.commit()
     return {"message": "Account updated"}

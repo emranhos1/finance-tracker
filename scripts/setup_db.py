@@ -145,6 +145,16 @@ def create_tables():
         ) ENGINE=InnoDB
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS account_types (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            name VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB
+    """)
+
     print("All tables ensured.")
 
     # Auto-migrations
@@ -153,6 +163,11 @@ def create_tables():
         ("ALTER TABLE accounts ADD COLUMN starting_date DATE NULL AFTER balance", "accounts.starting_date"),
         ("ALTER TABLE accounts ADD COLUMN account_number VARCHAR(50) NULL AFTER maturity_date", "accounts.account_number"),
         ("ALTER TABLE accounts MODIFY COLUMN type ENUM('cash','bank','dps','fdr','plot') NOT NULL", "accounts.type plot"),
+        ("ALTER TABLE accounts ADD COLUMN account_type_id INT NULL AFTER type", "accounts.account_type_id"),
+        ("ALTER TABLE account_types DROP COLUMN `group`", "account_types drop group"),
+        ("ALTER TABLE account_types DROP COLUMN has_account_number", "account_types drop has_account_number"),
+        ("ALTER TABLE account_types DROP COLUMN has_maturity_date", "account_types drop has_maturity_date"),
+        ("ALTER TABLE account_types DROP COLUMN has_installment", "account_types drop has_installment"),
     ]
     for sql, name in migrations:
         try:
@@ -162,6 +177,50 @@ def create_tables():
             pass
 
     cursor.close(); conn.close()
+
+
+DEFAULT_ACCOUNT_TYPES = [
+    # (old_enum_value, name)
+    ("cash", "CASH"),
+    ("bank", "BANK"),
+    ("dps",  "DPS"),
+    ("fdr",  "FDR"),
+    ("plot", "PLOT"),
+]
+
+
+def seed_account_types_and_migrate():
+    conn = MySQLdb.connect(host=MYSQL_HOST, port=MYSQL_PORT, user=MYSQL_ROOT_USER, passwd=MYSQL_ROOT_PASSWORD, db=MYSQL_DATABASE)
+    conn.autocommit(True)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users")
+    user_ids = [row[0] for row in cursor.fetchall()]
+
+    for uid in user_ids:
+        type_ids = {}
+        for old_value, name in DEFAULT_ACCOUNT_TYPES:
+            cursor.execute("SELECT id FROM account_types WHERE user_id = %s AND name = %s", (uid, name))
+            row = cursor.fetchone()
+            if row:
+                type_ids[old_value] = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO account_types (user_id, name) VALUES (%s, %s)",
+                    (uid, name)
+                )
+                type_ids[old_value] = cursor.lastrowid
+
+        # Migrate existing accounts' old enum `type` -> account_type_id
+        for old_value, type_id in type_ids.items():
+            cursor.execute(
+                "UPDATE accounts SET account_type_id = %s WHERE user_id = %s AND type = %s AND account_type_id IS NULL",
+                (type_id, uid, old_value)
+            )
+
+    print(f"Account types seeded/migrated for {len(user_ids)} user(s).")
+    cursor.close(); conn.close()
+
 
 
 def seed_admin():
@@ -186,6 +245,7 @@ if __name__ == "__main__":
         setup_database()
         create_tables()
         seed_admin()
+        seed_account_types_and_migrate()
         print("=== Setup complete ===")
     except Exception as e:
         print(f"FATAL ERROR: {e}")

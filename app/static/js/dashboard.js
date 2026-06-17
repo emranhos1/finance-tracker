@@ -25,7 +25,7 @@ async function renderDashboard(container) {
   document.getElementById('netWorth').textContent     = fmt(data.net_worth);
   document.getElementById('cashTotal').textContent    = fmt(data.cash_total);
   document.getElementById('bankTotal').textContent    = fmt(data.bank_total);
-  document.getElementById('savingsTotal').textContent = fmt(data.dps_total + data.fdr_total);
+  document.getElementById('savingsTotal').textContent = fmt(data.savings_total);
   document.getElementById('plotTotal').textContent    = fmt(data.plot_total);
 
   // Period cards
@@ -40,7 +40,7 @@ async function renderDashboard(container) {
       <div style="display:flex;justify-content:space-between;align-items:center;
         padding:0.5rem 0;border-bottom:1px solid var(--border)">
         <div>
-          <span class="badge badge-${a.type}">${a.type.toUpperCase()}</span>
+          <span class="badge badge-other">${(a.account_type_name || '—').toUpperCase()}</span>
           <span style="margin-left:0.5rem">${a.name}</span>
         </div>
         <span style="font-weight:600">${fmt(a.balance)}</span>

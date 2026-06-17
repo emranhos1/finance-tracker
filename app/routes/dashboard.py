@@ -5,14 +5,32 @@ from datetime import date
 from typing import Optional
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Transaction, Account, Category, User
+from app.models.models import Transaction, Account, AccountType, Category, User
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 reports_router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
-def get_cash_out_for_period(db: Session, user_id: int, start: date, end: date) -> float:
-    cash_ids = [a.id for a in db.query(Account.id).filter(Account.user_id == user_id, Account.type == 'cash').all()]
+def _dashboard_bucket(type_name: str):
+    """Internal helper: which dashboard total an account's balance counts toward."""
+    n = (type_name or "").strip().upper()
+    if n == "CASH": return "cash"
+    if n == "BANK": return "bank"
+    if n in ("DPS", "FDR"): return "savings"
+    if n == "PLOT": return "plot"
+    return None
+
+
+def serialize_account(a: Account) -> dict:
+    return {
+        "id": a.id,
+        "name": a.name,
+        "account_type_name": a.account_type.name if a.account_type else None,
+        "balance": float(a.balance),
+    }
+
+
+def get_cash_out_for_period(db: Session, user_id: int, start: date, end: date, cash_ids: list) -> float:
     if not cash_ids: return 0.0
     expense_out = db.query(func.coalesce(func.sum(Transaction.amount), 0)).filter(
         Transaction.user_id == user_id, Transaction.type == 'expense',
@@ -25,13 +43,6 @@ def get_cash_out_for_period(db: Session, user_id: int, start: date, end: date) -
     return float(expense_out or 0) + float(transfer_out or 0)
 
 
-def get_current_cash(db: Session, user_id: int) -> float:
-    result = db.query(func.coalesce(func.sum(Account.balance), 0)).filter(
-        Account.user_id == user_id, Account.type == 'cash'
-    ).scalar()
-    return float(result or 0)
-
-
 @router.get("/summary")
 def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     uid   = current_user.id
@@ -39,21 +50,33 @@ def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_
     month_start = today.replace(day=1)
     year_start  = today.replace(month=1, day=1)
 
-    net_worth  = float(db.query(func.coalesce(func.sum(Account.balance), 0)).filter(
-        Account.user_id == uid, Account.type.in_(['bank','dps','fdr'])
-    ).scalar())
-    current_cash = get_current_cash(db, uid)
+    accounts = db.query(Account).filter(Account.user_id == uid).all()
 
-    today_out = get_cash_out_for_period(db, uid, today, today)
-    month_out = get_cash_out_for_period(db, uid, month_start, today)
-    year_out  = get_cash_out_for_period(db, uid, year_start,  today)
+    cash_total    = 0.0
+    bank_total    = 0.0
+    savings_total = 0.0
+    plot_total    = 0.0
+    cash_ids      = []
 
-    accounts   = db.query(Account).filter(Account.user_id == uid).all()
-    cash_total = sum(float(a.balance) for a in accounts if a.type == 'cash')
-    bank_total = sum(float(a.balance) for a in accounts if a.type == 'bank')
-    dps_total  = sum(float(a.balance) for a in accounts if a.type == 'dps')
-    fdr_total  = sum(float(a.balance) for a in accounts if a.type == 'fdr')
-    plot_total = sum(float(a.balance) for a in accounts if a.type == 'plot')
+    for a in accounts:
+        bucket = _dashboard_bucket(a.account_type.name) if a.account_type else None
+        balance = float(a.balance)
+        if bucket == 'cash':
+            cash_total += balance
+            cash_ids.append(a.id)
+        elif bucket == 'bank':
+            bank_total += balance
+        elif bucket == 'savings':
+            savings_total += balance
+        elif bucket == 'plot':
+            plot_total += balance
+
+    net_worth = bank_total + savings_total
+    current_cash = cash_total
+
+    today_out = get_cash_out_for_period(db, uid, today, today, cash_ids)
+    month_out = get_cash_out_for_period(db, uid, month_start, today, cash_ids)
+    year_out  = get_cash_out_for_period(db, uid, year_start,  today, cash_ids)
 
     cat_breakdown = db.query(
         Category.name, func.sum(Transaction.amount).label("total")
@@ -63,17 +86,16 @@ def get_summary(db: Session = Depends(get_db), current_user: User = Depends(get_
     ).group_by(Category.id, Category.name).all()
 
     return {
-        "net_worth":   net_worth,
-        "cash_total":  cash_total,
-        "bank_total":  bank_total,
-        "dps_total":   dps_total,
-        "fdr_total":   fdr_total,
-        "plot_total":  plot_total,
+        "net_worth":     net_worth,
+        "cash_total":    cash_total,
+        "bank_total":    bank_total,
+        "savings_total": savings_total,
+        "plot_total":    plot_total,
         "today": {"opening_cash": current_cash + today_out, "out": today_out, "current_cash": current_cash},
         "month": {"opening_cash": current_cash + month_out, "out": month_out, "current_cash": current_cash},
         "year":  {"opening_cash": current_cash + year_out,  "out": year_out,  "current_cash": current_cash},
         "category_breakdown": [{"name": r.name, "total": float(r.total)} for r in cat_breakdown],
-        "accounts": [{"id": a.id, "name": a.name, "type": a.type, "balance": float(a.balance)} for a in accounts],
+        "accounts": [serialize_account(a) for a in accounts],
     }
 
 
@@ -161,5 +183,5 @@ def get_report(
     return {
         "period": period,
         "rows": rows,
-        "accounts": [{"id": a.id, "name": a.name, "type": a.type, "balance": float(a.balance)} for a in accounts],
+        "accounts": [serialize_account(a) for a in accounts],
     }

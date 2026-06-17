@@ -3,6 +3,7 @@
 const pages = {
   dashboard:   renderDashboard,
   accounts:    renderAccounts,
+  account_types: renderAccountTypes,
   categories:  renderCategories,
   transaction: renderTransaction,
   transfer:    renderTransfer,
@@ -16,6 +17,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.page === page);
   });
+  // Auto-open "Manage" group if the active page is inside it
+  const manageGroup = document.querySelector('.nav-group');
+  const isInManage  = !!manageGroup.querySelector(`[data-page="${page}"]`);
+  manageGroup.classList.toggle('open', isInManage);
+
   pages[page](document.getElementById('mainContent'));
   if (role === 'admin') refreshPendingBadge();
 }
@@ -30,6 +36,18 @@ if (role === 'admin') {
 if (username) {
   document.getElementById('userInfo').textContent = `👤 ${username}${role === 'admin' ? ' (admin)' : ''}`;
 }
+
+document.getElementById('userInfo').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.querySelector('.user-menu').classList.toggle('open');
+});
+
+document.addEventListener('click', (e) => {
+  const menu = document.querySelector('.user-menu');
+  if (menu.classList.contains('open') && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
 
 async function refreshPendingBadge() {
   if (role !== 'admin') return;
@@ -110,10 +128,18 @@ function showChangePasswordModal() {
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
+  if (btn.id === 'manageToggle') return; // handled separately
   btn.addEventListener('click', () => navigate(btn.dataset.page));
 });
 
-document.getElementById('changePassBtn').addEventListener('click', showChangePasswordModal);
+document.getElementById('manageToggle').addEventListener('click', () => {
+  document.querySelector('.nav-group').classList.toggle('open');
+});
+
+document.getElementById('changePassBtn').addEventListener('click', () => {
+  document.querySelector('.user-menu').classList.remove('open');
+  showChangePasswordModal();
+});
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('token');

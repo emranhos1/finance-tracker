@@ -18,11 +18,22 @@
     <ul class="nav-links">
       <li><button class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</button></li>
       <li><button class="nav-btn" data-page="accounts"><span class="nav-icon">🏦</span> Accounts</button></li>
-      <li><button class="nav-btn" data-page="categories"><span class="nav-icon">🏷️</span> Categories</button></li>
       <li><button class="nav-btn" data-page="transaction"><span class="nav-icon">💸</span> New Transaction</button></li>
       <li><button class="nav-btn" data-page="transfer"><span class="nav-icon">🔄</span> Transfer</button></li>
       <li><button class="nav-btn" data-page="reports"><span class="nav-icon">📈</span> Reports</button></li>
-      <li><button class="nav-btn" data-page="import"><span class="nav-icon">📥</span> Import Data</button></li>
+
+      <!-- Manage submenu (collapsible) -->
+      <li class="nav-group">
+        <button class="nav-btn nav-group-toggle" id="manageToggle">
+          <span class="nav-icon">⚙️</span> Manage
+          <span class="nav-arrow">▾</span>
+        </button>
+        <ul class="nav-submenu" id="manageSubmenu">
+          <li><button class="nav-btn" data-page="account_types"><span class="nav-icon">🏷️</span> Account Types</button></li>
+          <li><button class="nav-btn" data-page="categories"><span class="nav-icon">🏷️</span> Categories</button></li>
+          <li><button class="nav-btn" data-page="import"><span class="nav-icon">📥</span> Import Data</button></li>
+        </ul>
+      </li>
       <!-- Admin only -->
       <li id="adminMenuItem" style="display:none">
         <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
@@ -45,9 +56,13 @@
       </li>
     </ul>
     <div class="sidebar-footer">
-      <div id="userInfo" style="font-size:0.78rem;color:var(--text-muted);padding:0.5rem 0;text-align:center"></div>
-      <button class="btn btn-outline" id="changePassBtn" style="width:100%;margin-bottom:0.5rem;font-size:0.82rem">🔑 Change Password</button>
-      <button class="logout-btn" id="logoutBtn">⬅ Logout</button>
+      <div class="user-menu">
+        <button class="user-menu-btn" id="userInfo"></button>
+        <div class="user-menu-dropdown" id="userMenuDropdown">
+          <button class="btn btn-outline" id="changePassBtn" style="width:100%;margin-bottom:0.5rem;font-size:0.78rem;white-space:nowrap;padding:0.5rem 0.4rem">🔑 Change Password</button>
+          <button class="logout-btn" id="logoutBtn">⬅ Logout</button>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -60,6 +75,7 @@
 <script src="/static/js/utils.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/accounts.js"></script>
+<script src="/static/js/account_types.js"></script>
 <script src="/static/js/categories.js"></script>
 <script src="/static/js/transaction.js"></script>
 <script src="/static/js/transfer.js"></script>

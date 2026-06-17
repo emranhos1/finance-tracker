@@ -15,9 +15,10 @@ class User(Base):
     is_active       = Column(Boolean, nullable=False, default=False)
     created_at      = Column(TIMESTAMP, server_default=func.now())
 
-    accounts     = relationship("Account",     back_populates="user", cascade="all, delete")
-    categories   = relationship("Category",   back_populates="user", cascade="all, delete")
-    transactions = relationship("Transaction", back_populates="user", cascade="all, delete")
+    accounts      = relationship("Account",     back_populates="user", cascade="all, delete")
+    account_types = relationship("AccountType", back_populates="user", cascade="all, delete")
+    categories    = relationship("Category",   back_populates="user", cascade="all, delete")
+    transactions  = relationship("Transaction", back_populates="user", cascade="all, delete")
 
 
 class PasswordResetToken(Base):
@@ -33,13 +34,25 @@ class PasswordResetToken(Base):
     user = relationship("User")
 
 
+class AccountType(Base):
+    __tablename__ = "account_types"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name       = Column(String(50), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    user     = relationship("User", back_populates="account_types")
+    accounts = relationship("Account", back_populates="account_type")
+
+
 class Account(Base):
     __tablename__ = "accounts"
 
     id                 = Column(Integer, primary_key=True, autoincrement=True)
     user_id            = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    account_type_id    = Column(Integer, ForeignKey("account_types.id", ondelete="RESTRICT"), nullable=False)
     name               = Column(String(100), nullable=False)
-    type               = Column(Enum("cash", "bank", "dps", "fdr", "plot"), nullable=False)
     balance            = Column(Numeric(15, 2), nullable=False, default=0.00)
     starting_date      = Column(Date, nullable=True)
     maturity_date      = Column(Date, nullable=True)
@@ -48,6 +61,7 @@ class Account(Base):
     created_at         = Column(TIMESTAMP, server_default=func.now())
 
     user              = relationship("User", back_populates="accounts")
+    account_type      = relationship("AccountType", back_populates="accounts")
     transactions_from = relationship("Transaction", foreign_keys="Transaction.from_account_id", back_populates="from_account")
     transactions_to   = relationship("Transaction", foreign_keys="Transaction.to_account_id",   back_populates="to_account")
 
