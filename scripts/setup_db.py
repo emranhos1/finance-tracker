@@ -87,7 +87,6 @@ def get_connection(db=None):
     if db:
         kwargs["db"] = db
     if MYSQL_SSL_CA:
-        kwargs["ssl_mode"] = "VERIFY_IDENTITY"
         kwargs["ssl"] = {"ca": MYSQL_SSL_CA}
     return MySQLdb.connect(**kwargs)
 
